@@ -36,7 +36,7 @@ const sendOtpEmail = async (email, otp) => {
       subject: 'Your Verification Code - College Tracker',
       text: `Your OTP for College Tracker verification is: ${otp}. It will expire in 10 minutes.`,
       html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 500px; border: 1px solid #e2e8f0; rounded-radius: 10px;">
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 500px; border: 1px solid #e2e8f0; border-radius: 10px;">
           <h2 style="color: #4f46e5; margin-bottom: 8px;">College Tracker Verification</h2>
           <p style="font-size: 14px; color: #64748b;">Please enter the following 6-digit OTP code to complete your registration or login:</p>
           <div style="background-color: #f8fafc; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
@@ -46,9 +46,11 @@ const sendOtpEmail = async (email, otp) => {
         </div>
       `,
     };
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions).catch((err) => {
+      console.error('Email sending failed:', err);
+    });
   } catch (err) {
-    console.error('❌ Failed to send OTP email:', err);
+    console.error('Email sending failed:', err);
   }
 };
 
@@ -69,7 +71,7 @@ router.post('/signup', async (req, res) => {
       if (existingUser.isVerified) {
         return res.status(400).json({ message: 'User with this email already exists' });
       }
-      // If user exists but is not verified, update password & send new OTP
+      // If user exists but is NOT verified: hash new password, generate NEW OTP, update user & save
       const hashedPassword = await bcrypt.hash(password, 10);
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -88,7 +90,7 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Hash password & generate OTP
+    // Hash password & generate OTP for new user
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
