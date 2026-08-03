@@ -28,30 +28,24 @@ const createTransporter = () => {
 };
 
 const sendOtpEmail = async (email, otp) => {
-  try {
-    const transporter = createTransporter();
-    const mailOptions = {
-      from: process.env.EMAIL_USER || '"College Tracker" <noreply@collegetracker.com>',
-      to: email,
-      subject: 'Your Verification Code - College Tracker',
-      text: `Your OTP for College Tracker verification is: ${otp}. It will expire in 10 minutes.`,
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 500px; border: 1px solid #e2e8f0; border-radius: 10px;">
-          <h2 style="color: #4f46e5; margin-bottom: 8px;">College Tracker Verification</h2>
-          <p style="font-size: 14px; color: #64748b;">Please enter the following 6-digit OTP code to complete your registration or login:</p>
-          <div style="background-color: #f8fafc; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #4f46e5;">${otp}</span>
-          </div>
-          <p style="font-size: 12px; color: #94a3b8;">This code is valid for 10 minutes. If you did not request this code, please ignore this email.</p>
+  const transporter = createTransporter();
+  const mailOptions = {
+    from: process.env.EMAIL_USER || '"College Tracker" <noreply@collegetracker.com>',
+    to: email,
+    subject: 'Your Verification Code - College Tracker',
+    text: `Your OTP for College Tracker verification is: ${otp}. It will expire in 10 minutes.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 500px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #4f46e5; margin-bottom: 8px;">College Tracker Verification</h2>
+        <p style="font-size: 14px; color: #64748b;">Please enter the following 6-digit OTP code to complete your registration or login:</p>
+        <div style="background-color: #f8fafc; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #4f46e5;">${otp}</span>
         </div>
-      `,
-    };
-    await transporter.sendMail(mailOptions).catch((err) => {
-      console.error('Email sending failed:', err);
-    });
-  } catch (err) {
-    console.error('Email sending failed:', err);
-  }
+        <p style="font-size: 12px; color: #94a3b8;">This code is valid for 10 minutes. If you did not request this code, please ignore this email.</p>
+      </div>
+    `,
+  };
+  await transporter.sendMail(mailOptions);
 };
 
 // POST /api/auth/signup
@@ -71,7 +65,8 @@ router.post('/signup', async (req, res) => {
       if (existingUser.isVerified) {
         return res.status(400).json({ message: 'User with this email already exists' });
       }
-      // If user exists but is NOT verified: hash new password, generate NEW OTP, update user & save
+
+      // Unverified existing user: update password, name, and generate new OTP
       const hashedPassword = await bcrypt.hash(password, 10);
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -82,7 +77,13 @@ router.post('/signup', async (req, res) => {
       existingUser.otpExpires = otpExpires;
 
       await existingUser.save();
-      await sendOtpEmail(emailLower, otp);
+
+      try {
+        await sendOtpEmail(emailLower, otp);
+      } catch (err) {
+        console.error("Nodemailer error:", err);
+        return res.status(500).json({ message: "Failed to send OTP email.", error: err.message });
+      }
 
       return res.status(200).json({
         message: 'OTP sent to email',
@@ -106,7 +107,13 @@ router.post('/signup', async (req, res) => {
     });
 
     await newUser.save();
-    await sendOtpEmail(emailLower, otp);
+
+    try {
+      await sendOtpEmail(emailLower, otp);
+    } catch (err) {
+      console.error("Nodemailer error:", err);
+      return res.status(500).json({ message: "Failed to send OTP email.", error: err.message });
+    }
 
     return res.status(200).json({
       message: 'OTP sent to email',
@@ -114,7 +121,7 @@ router.post('/signup', async (req, res) => {
     });
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ message: 'Server error during signup', error: error.message });
+    return res.status(500).json({ message: 'Server error during signup', error: error.message });
   }
 });
 
@@ -168,7 +175,7 @@ router.post('/verify-otp', async (req, res) => {
     });
   } catch (error) {
     console.error('Verify OTP error:', error);
-    res.status(500).json({ message: 'Server error during OTP verification', error: error.message });
+    return res.status(500).json({ message: 'Server error during OTP verification', error: error.message });
   }
 });
 
@@ -204,7 +211,12 @@ router.post('/login', async (req, res) => {
       user.otpExpires = otpExpires;
       await user.save();
 
-      await sendOtpEmail(emailLower, otp);
+      try {
+        await sendOtpEmail(emailLower, otp);
+      } catch (err) {
+        console.error("Nodemailer error:", err);
+        return res.status(500).json({ message: "Failed to send OTP email.", error: err.message });
+      }
 
       return res.status(200).json({
         success: false,
@@ -221,7 +233,7 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({
+    return res.status(200).json({
       success: true,
       message: 'Login successful',
       token,
@@ -234,7 +246,7 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login', error: error.message });
+    return res.status(500).json({ message: 'Server error during login', error: error.message });
   }
 });
 
