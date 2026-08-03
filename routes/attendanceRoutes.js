@@ -1,13 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const DailyLog = require('../models/DailyLog');
+const authMiddleware = require('../middleware/auth');
+
+// Protect all attendance routes with authentication middleware
+router.use(authMiddleware);
 
 // @route   GET /api/attendance
-// @desc    Fetch attendance logs overview / API status
-// @access  Public
+// @desc    Fetch user's attendance logs overview / API status
+// @access  Private
 router.get('/', async (req, res) => {
   try {
-    const logs = await DailyLog.find().sort({ date: -1 }).limit(50);
+    const logs = await DailyLog.find({ user: req.user.id }).sort({ date: -1 }).limit(50);
     return res.status(200).json({
       success: true,
       message: 'Attendance API',
@@ -30,11 +34,11 @@ router.get('/', async (req, res) => {
 });
 
 // @route   GET /api/attendance/stats
-// @desc    Calculate attendance percentage and 75% warning status per subject
-// @access  Public
+// @desc    Calculate attendance percentage and 75% warning status per subject for authenticated user
+// @access  Private
 router.get('/stats', async (req, res) => {
   try {
-    const logs = await DailyLog.find().sort({ date: 1 });
+    const logs = await DailyLog.find({ user: req.user.id }).sort({ date: 1 });
 
     // Group logs by subject
     const subjectMap = {};
@@ -98,7 +102,7 @@ router.get('/stats', async (req, res) => {
         ? Math.round((grandAttendedClasses / grandTotalClasses) * 100)
         : 100;
 
-    console.log(`📊 [GET /stats] Calculated stats for ${statsList.length} subjects. Overall: ${overallPercentage}%`);
+    console.log(`📊 [GET /stats] User ${req.user.id}: Calculated stats for ${statsList.length} subjects. Overall: ${overallPercentage}%`);
 
     return res.status(200).json({
       success: true,
@@ -120,10 +124,10 @@ router.get('/stats', async (req, res) => {
 });
 
 // @route   POST /api/attendance/log
-// @desc    Log or update attendance for a specific date and subject
-// @access  Public
+// @desc    Log or update attendance for a specific date and subject for authenticated user
+// @access  Private
 router.post('/log', async (req, res) => {
-  console.log('📥 [POST /api/attendance/log] Incoming request body:', JSON.stringify(req.body, null, 2));
+  console.log(`📥 [POST /api/attendance/log] Request from user ${req.user.id}:`, JSON.stringify(req.body, null, 2));
   try {
     const {
       date,
@@ -152,13 +156,15 @@ router.post('/log', async (req, res) => {
     const endOfDay = new Date(logDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Upsert query filter by date range and subject
+    // Upsert query filter by user, date range, and subject
     const filter = {
+      user: req.user.id,
       date: { $gte: startOfDay, $lte: endOfDay },
       subject: subject,
     };
 
     const update = {
+      user: req.user.id,
       date: logDate,
       subject,
       status,
@@ -201,8 +207,8 @@ router.post('/log', async (req, res) => {
 });
 
 // @route   GET /api/attendance/today
-// @desc    Fetch all DailyLog records for the current date
-// @access  Public
+// @desc    Fetch all DailyLog records for current date for authenticated user
+// @access  Private
 router.get('/today', async (req, res) => {
   try {
     const today = new Date();
@@ -213,10 +219,11 @@ router.get('/today', async (req, res) => {
     endOfToday.setHours(23, 59, 59, 999);
 
     const logs = await DailyLog.find({
+      user: req.user.id,
       date: { $gte: startOfToday, $lte: endOfToday },
     }).sort({ date: 1 });
 
-    console.log(`📋 [GET /today] Found ${logs.length} logs for today.`);
+    console.log(`📋 [GET /today] Found ${logs.length} logs for user ${req.user.id} today.`);
 
     return res.status(200).json({
       success: true,
@@ -234,8 +241,8 @@ router.get('/today', async (req, res) => {
 });
 
 // @route   GET /api/attendance/history/:date
-// @desc    Fetch all DailyLog records for a specific date (YYYY-MM-DD)
-// @access  Public
+// @desc    Fetch all DailyLog records for a specific date (YYYY-MM-DD) for authenticated user
+// @access  Private
 router.get('/history/:date', async (req, res) => {
   try {
     const { date } = req.params;
@@ -261,10 +268,11 @@ router.get('/history/:date', async (req, res) => {
     endDate.setHours(23, 59, 59, 999);
 
     const logs = await DailyLog.find({
+      user: req.user.id,
       date: { $gte: startDate, $lte: endDate },
     }).sort({ date: 1 });
 
-    console.log(`📅 [GET /history/${date}] Found ${logs.length} logs.`);
+    console.log(`📅 [GET /history/${date}] Found ${logs.length} logs for user ${req.user.id}.`);
 
     return res.status(200).json(logs);
   } catch (error) {
@@ -278,4 +286,3 @@ router.get('/history/:date', async (req, res) => {
 });
 
 module.exports = router;
-
