@@ -83,16 +83,14 @@ router.post('/signup', async (req, res) => {
 
       await existingUser.save();
 
-      try {
-        await sendOtpEmail(emailLower, otp);
-      } catch (err) {
-        console.error("Nodemailer error:", err);
-        return res.status(500).json({ message: "Failed to send OTP email.", error: err.message });
-      }
+      // Commented out Nodemailer sendMail to bypass outbound SMTP port block on Render free tier
+      // await sendOtpEmail(emailLower, otp);
+      console.log('\n===========================\n🚀 DEV OTP for ' + emailLower + ' is: ' + otp + '\n===========================\n');
 
       return res.status(200).json({
-        message: 'OTP sent to email',
+        message: 'OTP generated (Check Render Logs)',
         email: emailLower,
+        requireOtp: true,
       });
     }
 
@@ -113,16 +111,14 @@ router.post('/signup', async (req, res) => {
 
     await newUser.save();
 
-    try {
-      await sendOtpEmail(emailLower, otp);
-    } catch (err) {
-      console.error("Nodemailer error:", err);
-      return res.status(500).json({ message: "Failed to send OTP email.", error: err.message });
-    }
+    // Commented out Nodemailer sendMail to bypass outbound SMTP port block on Render free tier
+    // await sendOtpEmail(emailLower, otp);
+    console.log('\n===========================\n🚀 DEV OTP for ' + emailLower + ' is: ' + otp + '\n===========================\n');
 
     return res.status(200).json({
-      message: 'OTP sent to email',
+      message: 'OTP generated (Check Render Logs)',
       email: emailLower,
+      requireOtp: true,
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -216,17 +212,14 @@ router.post('/login', async (req, res) => {
       user.otpExpires = otpExpires;
       await user.save();
 
-      try {
-        await sendOtpEmail(emailLower, otp);
-      } catch (err) {
-        console.error("Nodemailer error:", err);
-        return res.status(500).json({ message: "Failed to send OTP email.", error: err.message });
-      }
+      // Commented out Nodemailer sendMail to bypass outbound SMTP port block on Render free tier
+      // await sendOtpEmail(emailLower, otp);
+      console.log('\n===========================\n🚀 DEV OTP for ' + emailLower + ' is: ' + otp + '\n===========================\n');
 
       return res.status(200).json({
         success: false,
         requireOtp: true,
-        message: 'Account not verified. A new OTP has been sent to your email.',
+        message: 'OTP generated (Check Render Logs)',
         email: emailLower,
       });
     }
