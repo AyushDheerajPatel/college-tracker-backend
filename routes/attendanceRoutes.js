@@ -207,7 +207,7 @@ router.post('/log', async (req, res) => {
 });
 
 // @route   GET /api/attendance/today
-// @desc    Fetch all DailyLog records for current date for authenticated user
+// @desc    Fetch DailyLog records for current date + overall historical stats for authenticated user
 // @access  Private
 router.get('/today', async (req, res) => {
   try {
@@ -223,12 +223,49 @@ router.get('/today', async (req, res) => {
       date: { $gte: startOfToday, $lte: endOfToday },
     }).sort({ date: 1 });
 
-    console.log(`📋 [GET /today] Found ${logs.length} logs for user ${req.user.id} today.`);
+    // Calculate overall historical stats for req.user.id
+    const allLogs = await DailyLog.find({ user: req.user.id });
+
+    let totalClasses = 0;
+    let attendedClasses = 0;
+    let bunkedClasses = 0;
+    let absentClasses = 0;
+    let teacherAbsentClasses = 0;
+
+    allLogs.forEach((log) => {
+      if (log.status === 'PRESENT') {
+        attendedClasses += 1;
+        totalClasses += 1;
+      } else if (log.status === 'BUNKED') {
+        bunkedClasses += 1;
+        totalClasses += 1;
+      } else if (log.status === 'ABSENT') {
+        absentClasses += 1;
+        totalClasses += 1;
+      } else if (log.status === 'TEACHER_ABSENT') {
+        teacherAbsentClasses += 1;
+      }
+    });
+
+    const overallPercentage =
+      totalClasses > 0 ? Math.round((attendedClasses / totalClasses) * 100) : 100;
+
+    const overallStats = {
+      totalClasses,
+      attendedClasses,
+      bunkedClasses,
+      absentClasses,
+      teacherAbsentClasses,
+      overallPercentage,
+    };
+
+    console.log(`📋 [GET /today] Found ${logs.length} logs today for user ${req.user.id}. Overall: ${overallPercentage}% across ${allLogs.length} total entries.`);
 
     return res.status(200).json({
       success: true,
       count: logs.length,
       data: logs,
+      overallStats,
     });
   } catch (error) {
     console.error('❌ [GET /today Error]:', error);
